@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Quantum Neural Bot .io</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #050510;
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* UI Overlay */
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* HUD */
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+
+        .score-box {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .leaderboard {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #00ffff;
+            pointer-events: auto;
+            min-width: 150px;
+        }
+
+        .leaderboard h3 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            font-size: 16px;
+            color: #00ffff;
+        }
+
+        .leaderboard ol {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 14px;
+        }
+
+        /* Start Screen & Game Over */
+        #menuScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 5, 16, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            z-index: 10;
+            transition: opacity 0.3s;
+        }
+
+        h1 {
+            font-size: 4rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+            text-align: center;
+        }
+
+        p.subtitle {
+            font-size: 1.2rem;
+            color: #ccc;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 600px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            padding: 15px;
+            font-size: 1.2rem;
+            border-radius: 30px;
+            border: 2px solid #00ffff;
+            background: rgba(0, 0, 0, 0.5);
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+            outline: none;
+            width: 250px;
+        }
+
+        button.btn-start {
+            padding: 15px 50px;
+            font-size: 1.5rem;
+            background: linear-gradient(45deg, #00ffff, #0088ff);
+            border: none;
+            border-radius: 30px;
+            color: #000;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+            cursor: pointer;
+            box-shadow: 0 0 20px #00ffff;
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+
+        button.btn-start:active {
+            transform: scale(0.95);
+        }
+
+        button.btn-restart {
+            margin-top: 20px;
+            padding: 10px 30px;
+            font-size: 1.2rem;
+            background: #ff0055;
+            border: none;
+            border-radius: 20px;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .author-info {
+            margin-top: 50px;
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+        }
+
+        .author-info a {
+            color: #00ffff;
+            text-decoration: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .score-box { font-size: 18px; }
+            .leaderboard { display: none; } /* Hide leaderboard on small screens to save space */
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="uiLayer">
+        <div class="hud-top" id="hud" style="opacity: 0;">
+            <div class="score-box">Moc Obliczeniowa: <span id="scoreVal">0</span> QB</div>
+            <div class="leaderboard">
+                <h3>Top Sieci</h3>
+                <ol id="leaderboardList">
+                    <li>AlphaGo - 5000</li>
+                    <li>Skynet - 4200</li>
+                    <li>HAL 9000 - 3000</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <div id="menuScreen">
+        <h1>QUANTUM.IO</h1>
+        <p class="subtitle">Wchłaniaj kubity. Przejmuj neurony. Zostań najpotężniejszą Sztuczną Inteligencją.</p>
+        
+        <div class="input-group" id="startInputs">
+            <input type="text" id="nickname" placeholder="Nazwa AI" maxlength="12" value="Player 1">
+        </div>
+        
+        <button class="btn-start" id="startBtn">START SYSTEMU</button>
+        
+        <div id="gameOverContent" class="hidden" style="text-align: center;">
+            <h2 style="color: #ff0055; font-size: 3rem; margin: 0;">CRITICAL ERROR</h2>
+            <p>Twój kod został nadpisany.</p>
+            <p>Wynik końcowy: <span id="finalScore">0</span></p>
+            <button class="btn-start" id="restartBtn">REBOOT SYSTEM</button>
+        </div>
+
+        <div class="author-info">
+            Autor: Damian Kita <br>
+            <a href="https://linktr.ee/kitadamian" target="_blank">https://linktr.ee/kitadamian</a>
+        </div>
+    </div>
+
+<script>
+/**
+ * AUDIO SYSTEM (Web Audio API)
+ * Generuje dźwięki i muzykę w czasie rzeczywistym bez zewnętrznych plików.
+ */
+class AudioController {
+    constructor() {
+        this.ctx = null;
+        this.bgOscillators = [];
+        this.isMuted = false;
+        this.initialized = false;
+    }
+
+    init() {
+        if (this.initialized) return;
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        this.ctx = new AudioContext();
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.3; // Ogólna głośność
+        this.masterGain.connect(this.ctx.destination);
+        this.initialized = true;
+    }
+
+    startMusic() {
+        if (!this.ctx) return;
+        
+        // Drone (Basowe tło)
+        const osc1 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        osc1.type = 'sawtooth';
+        osc1.frequency.value = 55; // Niskie A
+        
+        // Filtr dolnoprzepustowy dla głębi
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+        
+        // LFO do modulacji filtra (pulsujący efekt)
+        const lfo = this.ctx.createOscillator();
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.2;
+        const lfoGain = this.ctx.createGain();
+        lfoGain.gain.value = 200;
+
+        lfo.connect(lfoGain);
+        lfoGain.connect(filter.frequency);
+
+        osc1.connect(filter);
+        filter.connect(gain1);
+        gain1.connect(this.masterGain);
+        
+        gain1.gain.value = 0.15;
+        osc1.start();
+        lfo.start();
+        
+        this.bgOscillators.push(osc1, lfo);
+
+        // Arpeggio (Melodia w tle)
+        this.arpInterval = setInterval(() => {
+            if(Math.random() > 0.7) this.playTone(880, 'sine', 0.1, 0.05); // Wysokie A
+            if(Math.random() > 0.8) this.playTone(659, 'sine', 0.1, 0.05); // E
+        }, 200);
+    }
+
+    stopMusic() {
+        this.bgOscillators.forEach(osc => osc.stop());
+        this.bgOscillators = [];
+        if (this.arpInterval) clearInterval(this.arpInterval);
+    }
+
+    // Efekt jedzenia (zbieranie kropek)
+    playEatSound() {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.frequency.setValueAtTime(400, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.1);
+        
+        gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+        
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.1);
+    }
+
+    // Efekt zniszczenia bota
+    playExplosion() {
+        if (!this.ctx) return;
+        const bufferSize = this.ctx.sampleRate * 0.5; // 0.5 sekundy
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1; // Biały szum
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const gain = this.ctx.createGain();
+        
+        gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+        
+        noise.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start();
+    }
+
+    // Prosty dźwięk
+    playTone(freq, type, duration, vol) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start();
+        osc.stop(this.ctx.currentTime + duration);
+    }
+}
+
+/**
+ * LOGIKA GRY
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('scoreVal');
+const menuScreen = document.getElementById('menuScreen');
+const startBtn = document.getElementById('startBtn');
+const restartBtn = document.getElementById('restartBtn');
+const nicknameInput = document.getElementById('nickname');
+const hud = document.getElementById('hud');
+const gameOverContent = document.getElementById('gameOverContent');
+const startInputs = document.getElementById('startInputs');
+const leaderboardList = document.getElementById('leaderboardList');
+const finalScoreEl = document.getElementById('finalScore');
+
+let audio = new AudioController();
+
+// Ustawienia świata gry
+const MAP_WIDTH = 3000;
+const MAP_HEIGHT = 3000;
+const INITIAL_PLAYER_RADIUS = 25;
+const PLAYER_SPEED_BASE = 4;
+const FOOD_COUNT = 400;
+const BOT_COUNT = 20;
+
+// Stan gry
+let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+let camera = { x: 0, y: 0 };
+let foods = [];
+let bots = [];
+let particles = [];
+let mouse = { x: 0, y: 0 }; // Pozycja myszy względem środka ekranu
+
+// Obiekt Gracza
+let player = {
+    x: MAP_WIDTH / 2,
+    y: MAP_HEIGHT / 2,
+    radius: INITIAL_PLAYER_RADIUS,
+    color: '#00ffff',
+    name: 'Player',
+    score: 0,
+    speed: PLAYER_SPEED_BASE
+};
+
+// Klasy pomocnicze
+class Food {
+    constructor() {
+        this.x = Math.random() * MAP_WIDTH;
+        this.y = Math.random() * MAP_HEIGHT;
+        this.radius = Math.random() * 5 + 4; // 4-9
+        this.color = Math.random() > 0.5 ? '#ff00ff' : '#00ff00'; // Kubity (róż) lub Neurony (ziel)
+        this.pulse = Math.random() * Math.PI;
+    }
+
+    draw(ctx) {
+        this.pulse += 0.1;
+        const pulseEffect = Math.sin(this.pulse) * 1 + 1;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius + pulseEffect, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.closePath();
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.radius = Math.random() * 3 + 1;
+        this.speedX = (Math.random() - 0.5) * 5;
+        this.speedY = (Math.random() - 0.5) * 5;
+        this.life = 1.0; // Opacity
+    }
+
+    update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.life -= 0.02;
+    }
+
+    draw(ctx) {
+        ctx.globalAlpha = this.life;
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+    }
+}
+
+class Bot {
+    constructor() {
+        this.respawn();
+    }
+
+    respawn() {
+        this.x = Math.random() * MAP_WIDTH;
+        this.y = Math.random() * MAP_HEIGHT;
+        this.radius = Math.random() * 30 + 15; // Rozmiar
+        this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        this.vx = Math.random() * 2 - 1;
+        this.vy = Math.random() * 2 - 1;
+        this.changeDirTimer = 0;
+        this.name = "Bot_" + Math.floor(Math.random() * 1000);
+        this.score = Math.floor(this.radius * 10);
+    }
+
+    update() {
+        // Prosta AI: Zmień kierunek losowo lub uciekaj/goń
+        this.changeDirTimer++;
+        if (this.changeDirTimer > 100) {
+            this.vx = Math.random() * 4 - 2;
+            this.vy = Math.random() * 4 - 2;
+            this.changeDirTimer = 0;
+        }
+
+        // Unikanie granic mapy
+        if (this.x < 50) this.vx = 2;
+        if (this.x > MAP_WIDTH - 50) this.vx = -2;
+        if (this.y < 50) this.vy = 2;
+        if (this.y > MAP_HEIGHT - 50) this.vy = -2;
+
+        this.x += this.vx;
+        this.y += this.vy;
+    }
+
+    draw(ctx) {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.fill();
+        ctx.stroke();
+        ctx.closePath();
+
+        // Imię bota
+        ctx.fillStyle = "#fff";
+        ctx.font = "12px Orbitron";
+        ctx.textAlign = "center";
+        ctx.fillText(this.name, this.x, this.y - this.radius - 5);
+    }
+}
+
+// Inicjalizacja
+function init() {
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Obsługa wejścia (Mysz)
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        // Obliczamy wektor od środka ekranu do myszy
+        mouse.x = e.clientX - rect.left - canvas.width / 2;
+        mouse.y = e.clientY - rect.top - canvas.height / 2;
+    });
+
+    // Obsługa wejścia (Dotyk - Mobile)
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = touch.clientX - rect.left - canvas.width / 2;
+        mouse.y = touch.clientY - rect.top - canvas.height / 2;
+    }, { passive: false });
+    
+    // Generuj jedzenie
+    for (let i = 0; i < FOOD_COUNT; i++) {
+        foods.push(new Food());
+    }
+
+    // Generuj boty
+    for (let i = 0; i < BOT_COUNT; i++) {
+        bots.push(new Bot());
+    }
+
+    gameLoop();
+}
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+
+function startGame() {
+    audio.init();
+    audio.startMusic();
+    
+    player.name = nicknameInput.value || "Anonim";
+    player.x = Math.random() * MAP_WIDTH;
+    player.y = Math.random() * MAP_HEIGHT;
+    player.radius = INITIAL_PLAYER_RADIUS;
+    player.score = 0;
+    
+    scoreEl.innerText = 0;
+    menuScreen.style.opacity = 0;
+    setTimeout(() => {
+        menuScreen.classList.add('hidden');
+        gameOverContent.classList.add('hidden');
+        startInputs.classList.remove('hidden');
+        startBtn.classList.remove('hidden');
+    }, 300);
+    
+    hud.style.opacity = 1;
+    gameState = 'PLAYING';
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    audio.playExplosion();
+    // audio.stopMusic(); // Można zostawić muzykę
+    
+    finalScoreEl.innerText = Math.floor(player.score);
+    
+    menuScreen.classList.remove('hidden');
+    menuScreen.style.opacity = 1;
+    
+    startInputs.classList.add('hidden');
+    startBtn.classList.add('hidden');
+    gameOverContent.classList.remove('hidden');
+}
+
+// Główna pętla gry
+function gameLoop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (gameState === 'PLAYING') {
+        updatePlayer();
+        updateBots();
+        checkCollisions();
+    }
+
+    // Kamera: Ustawia środek widoku na graczu
+    // Jeśli gra się skończyła, kamera zostaje w ostatnim miejscu
+    camera.x = player.x - canvas.width / 2;
+    camera.y = player.y - canvas.height / 2;
+
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    drawBackgroundGrid();
+    drawFood();
+    drawBots();
+    if (gameState === 'PLAYING') drawPlayer();
+    drawParticles();
+
+    ctx.restore();
+
+    // Aktualizuj leaderboard (tylko symulacja)
+    if (gameState === 'PLAYING' && Math.random() < 0.05) updateLeaderboard();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function updatePlayer() {
+    // Ruch gracza w kierunku myszy/dotyku
+    const angle = Math.atan2(mouse.y, mouse.x);
+    // Prędkość maleje wraz ze wzrostem rozmiaru
+    const speed = PLAYER_SPEED_BASE * Math.pow(INITIAL_PLAYER_RADIUS / player.radius, 0.4);
+    
+    // Ograniczenie, żeby gracz nie drgał w miejscu
+    const dist = Math.hypot(mouse.x, mouse.y);
+    if (dist > 5) {
+        player.x += Math.cos(angle) * speed;
+        player.y += Math.sin(angle) * speed;
+    }
+
+    // Granice mapy
+    player.x = Math.max(player.radius, Math.min(MAP_WIDTH - player.radius, player.x));
+    player.y = Math.max(player.radius, Math.min(MAP_HEIGHT - player.radius, player.y));
+}
+
+function updateBots() {
+    bots.forEach(bot => {
+        bot.update();
+        // Powolny wzrost botów
+        if(Math.random() < 0.01) bot.radius += 0.1;
+    });
+}
+
+function checkCollisions() {
+    // Kolizja Gracz vs Jedzenie
+    for (let i = foods.length - 1; i >= 0; i--) {
+        const f = foods[i];
+        const dist = Math.hypot(player.x - f.x, player.y - f.y);
+        
+        if (dist < player.radius + f.radius) {
+            // Zjedzono
+            player.score += 5;
+            player.radius += 0.2; // Wzrost
+            scoreEl.innerText = Math.floor(player.score);
+            foods.splice(i, 1);
+            foods.push(new Food()); // Nowe jedzenie
+            audio.playEatSound();
+            createParticles(f.x, f.y, f.color, 3);
+        }
+    }
+
+    // Kolizja Gracz vs Boty
+    for (let i = bots.length - 1; i >= 0; i--) {
+        const bot = bots[i];
+        const dist = Math.hypot(player.x - bot.x, player.y - bot.y);
+        const minDist = player.radius + bot.radius;
+
+        if (dist < minDist * 0.8) { // Kolizja z marginesem
+            if (player.radius > bot.radius * 1.1) {
+                // Gracz zjada bota
+                player.radius += bot.radius * 0.2;
+                player.score += bot.radius * 10;
+                scoreEl.innerText = Math.floor(player.score);
+                createParticles(bot.x, bot.y, bot.color, 15);
+                audio.playExplosion();
+                bot.respawn(); // Bot odradza się gdzie indziej
+            } else if (bot.radius > player.radius * 1.1) {
+                // Bot zjada gracza
+                createParticles(player.x, player.y, player.color, 20);
+                gameOver();
+            }
+        }
+    }
+}
+
+function drawPlayer() {
+    ctx.save();
+    ctx.translate(player.x, player.y);
+    
+    // Poświata
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = player.color;
+
+    // Ciało
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+    ctx.fillStyle = player.color;
+    ctx.fill();
+    
+    // Efekt "Rdzenia"
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius * 0.6, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+    ctx.fill();
+
+    // Nazwa
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 14px Orbitron";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(player.name, 0, 0);
+
+    ctx.restore();
+}
+
+function drawBots() {
+    bots.forEach(bot => bot.draw(ctx));
+}
+
+function drawFood() {
+    foods.forEach(f => f.draw(ctx));
+}
+
+function drawParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+        particles[i].update();
+        particles[i].draw(ctx);
+        if (particles[i].life <= 0) {
+            particles.splice(i, 1);
+        }
+    }
+}
+
+function createParticles(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+        particles.push(new Particle(x, y, color));
+    }
+}
+
+function drawBackgroundGrid() {
+    const gridSize = 100;
+    const xOffset = -camera.x % gridSize;
+    const yOffset = -camera.y % gridSize;
+
+    ctx.beginPath();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#1a1a2e';
+
+    // Pionowe linie
+    for (let x = xOffset; x < canvas.width; x += gridSize) {
+        ctx.moveTo(camera.x + x, camera.y); // Korekta dla dużego świata
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+    }
+    // Poziome linie
+    for (let y = yOffset; y < canvas.height; y += gridSize) {
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+    }
+    ctx.stroke();
+
+    // Granice mapy
+    ctx.strokeStyle = '#ff0055';
+    ctx.lineWidth = 5;
+    ctx.strokeRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+}
+
+function updateLeaderboard() {
+    // Tworzy tymczasową tablicę z botami i graczem
+    let allEntities = [...bots];
+    if (gameState === 'PLAYING') {
+        allEntities.push({ name: player.name, radius: player.radius });
+    }
+    
+    // Sortuj po rozmiarze
+    allEntities.sort((a, b) => b.radius - a.radius);
+    
+    // Wyświetl top 5
+    let html = '';
+    for(let i=0; i<Math.min(5, allEntities.length); i++) {
+        let ent = allEntities[i];
+        let score = Math.floor(ent.radius * 10);
+        let style = (ent.name === player.name) ? 'color: #00ff00;' : '';
+        html += `<li style="${style}">${ent.name} - ${score}</li>`;
+    }
+    leaderboardList.innerHTML = html;
+}
+
+// Event Listeners UI
+startBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+
+// Start init
+init();
+
+</script>
+</body>
+</html>
